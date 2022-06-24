@@ -15,78 +15,97 @@
  *******************************************************************************/
 package org.gameontext.signed;
 
-import java.io.FileInputStream;
-import java.io.IOException;
-import java.security.Key;
-import java.security.KeyStore;
-import java.security.KeyStoreException;
+import java.io.ByteArrayInputStream;
+import java.nio.charset.StandardCharsets;
+import java.security.cert.Certificate;
+import java.security.KeyFactory;
 import java.security.NoSuchAlgorithmException;
-import java.security.UnrecoverableKeyException;
+import java.security.PrivateKey;
 import java.security.cert.CertificateException;
+import java.security.cert.CertificateFactory;
+import java.security.spec.InvalidKeySpecException;
+import java.security.spec.PKCS8EncodedKeySpec;
+import java.util.Base64;
+import java.util.Optional;
+import java.util.Base64.Decoder;
 
 import javax.annotation.PostConstruct;
-import javax.annotation.Resource;
 import javax.enterprise.context.ApplicationScoped;
 
-import io.jsonwebtoken.Claims;
-import io.jsonwebtoken.Jwts;
-import io.jsonwebtoken.SignatureAlgorithm;
+import org.eclipse.microprofile.config.ConfigProvider;
+import org.jose4j.jwt.JwtClaims;
+import org.jose4j.jwt.consumer.InvalidJwtException;
+
+import io.smallrye.jwt.auth.principal.JWTCallerPrincipal;
+import io.smallrye.jwt.build.Jwt;
+import io.smallrye.jwt.build.JwtClaimsBuilder;
 
 @ApplicationScoped
 public class SignedJWTValidator {
 
-    public static final String JWT_QUERY_PARAMETER = "jwt";
-    public static final String JWT_CLIENT_HEADER = "gameon-jwt";
-    public static final String JWT_CLIENT_VALID = "valid";
-    public static final String JWT_CLIENT_INVALID = "invalid";
-
-
-    // Keystore info for jwt parsing / creation.
-    @Resource(lookup = "jwtKeyStore")
-    String keyStore;
-    @Resource(lookup = "jwtKeyStorePassword")
-    String keyStorePW;
-    @Resource(lookup = "jwtKeyStoreAlias")
-    String keyStoreAlias;
 
     /** SignedJWT Signing key */
-    private Key signingKey = null;
+    protected PrivateKey signingKey = null;
+    protected Optional<String> pemKey = null;
+
+    /** SignedJWT verification Certificate */
+    protected Certificate validationCert = null;
+    protected String pemCert;
 
     /**
      * Obtain the key we'll use to sign the jwts we issue.
     */
     @PostConstruct
-    protected void getKeyStoreInfo() {
+    protected void readKeyAndCert() {
         try {
-            // load up the keystore..
-            FileInputStream is = new FileInputStream(keyStore);
-            KeyStore signingKeystore = KeyStore.getInstance(KeyStore.getDefaultType());
-            signingKeystore.load(is, keyStorePW.toCharArray());
+            if(null==pemKey || pemKey.equals("x")){
+                pemKey = ConfigProvider.getConfig().getOptionalValue("JWT_PRIVATE_KEY", String.class);
+            }
 
-            // grab the key we'll use to sign
-            signingKey = signingKeystore.getKey(keyStoreAlias, keyStorePW.toCharArray());
+            if(pemKey.isPresent()){                    
+                String stripped = pemKey.get().replace("-----BEGIN PRIVATE KEY-----", "").replace("-----END PRIVATE KEY-----", "").replace("\n", "");
+            
+                Decoder decoder = Base64.getDecoder();
+                byte[] decoded = decoder.decode(stripped);
 
-        } catch (KeyStoreException | NoSuchAlgorithmException | CertificateException | UnrecoverableKeyException | IOException e) {
-            throw new IllegalStateException("Unable to retrieve keystore required to sign JWTs: " + keyStore, e);
+                PKCS8EncodedKeySpec keySpec = new PKCS8EncodedKeySpec(decoded);
+                KeyFactory kf = KeyFactory.getInstance("RSA");
+                signingKey = kf.generatePrivate(keySpec);
+            }
+
+            if(null==pemCert || pemCert.equals("x")){
+                pemCert = ConfigProvider.getConfig().getValue("JWT_PUBLIC_CERT", String.class);
+            }
+            CertificateFactory factory = CertificateFactory.getInstance("X.509");
+            validationCert = factory.generateCertificate(new ByteArrayInputStream(pemCert.getBytes()));
+
+        } catch (NoSuchAlgorithmException |
+                InvalidKeySpecException e) {
+            throw new IllegalStateException("Unable to process private key", e);
+        } catch (CertificateException e) {
+            throw new IllegalStateException("Unable to process public cert", e);
         }
-    }
+    }           
 
     public SignedJWT getJWT(String jwtParam) {
-        return new SignedJWT(signingKey, jwtParam);
+        return new SignedJWT(validationCert, jwtParam);
     }
 
     public String clientToServer(SignedJWT jwt) {
+        if( signingKey == null){
+            throw new IllegalStateException("Cannot convert client token to server token due to missing private key");
+        }
         if ( jwt.isValid() ) {
-            Claims onwardsClaims = Jwts.claims();
-            // add all the client claims
-            onwardsClaims.putAll(jwt.getClaims());
-            // upgrade the type to server
-            onwardsClaims.setAudience("server");
 
-            // build the new jwt
-            String newJwt = Jwts.builder().setHeaderParam("kid", "playerssl")
-                    .setClaims(onwardsClaims)
-                    .signWith(SignatureAlgorithm.RS256, signingKey).compact();
+            JwtClaimsBuilder claimsBuilder = Jwt.claims();
+
+            for(String claimName : jwt.getClaimNames() ){
+                claimsBuilder.claim(claimName, jwt.getClaim(claimName));
+            }
+
+            claimsBuilder.audience("server");
+
+            String newJwt = claimsBuilder.jws().sign(signingKey);
 
             return newJwt;
         }

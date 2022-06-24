@@ -15,16 +15,23 @@
  *******************************************************************************/
 package org.gameontext.signed;
 
+import java.nio.charset.StandardCharsets;
 import java.security.Key;
+import java.security.PublicKey;
 import java.security.cert.Certificate;
+import java.util.Base64;
+import java.util.Collection;
+import java.util.Collections;
+import java.util.Set;
 import java.util.logging.Level;
 
-import io.jsonwebtoken.Claims;
-import io.jsonwebtoken.ExpiredJwtException;
-import io.jsonwebtoken.Jws;
-import io.jsonwebtoken.Jwts;
-import io.jsonwebtoken.MalformedJwtException;
-import io.jsonwebtoken.SignatureException;
+import org.jose4j.jwt.JwtClaims;
+import org.jose4j.jwt.consumer.InvalidJwtException;
+
+import io.smallrye.jwt.auth.principal.JWTAuthContextInfo;
+import io.smallrye.jwt.auth.principal.JWTCallerPrincipal;
+import io.smallrye.jwt.auth.principal.JWTCallerPrincipalFactory;
+import io.smallrye.jwt.auth.principal.ParseException;
 
 /**
  * Common class for handling JSON Web Tokens
@@ -38,13 +45,13 @@ public class SignedJWT {
     private FailureCode code = FailureCode.NONE;
 
     private String token = null;
-    private Jws<Claims> jwt = null;
+    private JWTCallerPrincipal jwtcp = null;
 
     public SignedJWT(Certificate cert, String... sources) {
         state = processSources(cert.getPublicKey(), sources);
     }
 
-    public SignedJWT(Key key, String... sources) {
+    public SignedJWT(PublicKey key, String... sources) {
         state = processSources(key, sources);
     }
 
@@ -71,7 +78,7 @@ public class SignedJWT {
         }
     }
 
-    private AuthenticationState processSources(Key key, String[] sources) {
+    private AuthenticationState processSources(PublicKey key, String[] sources) {
         AuthenticationState state = AuthenticationState.ACCESS_DENIED; // default
 
         //find the first non-empty source, assign to token
@@ -82,15 +89,19 @@ public class SignedJWT {
             code = FailureCode.MISSING_JWT;
         } else {
             try {
-                jwt = Jwts.parser().setSigningKey(key).parseClaimsJws(token);
+                JWTAuthContextInfo ctx = new JWTAuthContextInfo(key, "test");
+                ctx.setIssuedBy(null);
+                ctx.setRequiredClaims(Set.of("sub","aud","name","id","exp","iat"));
+                //ctx.setMaxTimeToLiveSecs(60L * 60L * 25L); //25hrs
+
+                JWTCallerPrincipalFactory factory = JWTCallerPrincipalFactory.instance();
+                jwtcp = factory.parse(token, ctx);
+
                 state = AuthenticationState.PASSED;
                 code = FailureCode.NONE;
-            } catch (MalformedJwtException | SignatureException e) {
+            } catch (ParseException e) {
                 code = FailureCode.BAD_SIGNATURE;
-                SignedRequestFeature.writeLog(Level.WARNING, this, "JWT has a bad signature {0}. {1}", e.getMessage(), token);
-            } catch (ExpiredJwtException e) {
-                code = FailureCode.EXPIRED;
-                SignedRequestFeature.writeLog(Level.WARNING, this, "JWT has expired {0}. {1}", e.getMessage(), token);
+                SignedRequestFeature.writeLog(Level.WARNING, this, "JWT failed validation {0}. {1}", e.getMessage(), token);
             }
         }
 
@@ -113,7 +124,28 @@ public class SignedJWT {
         return token;
     }
 
-    public Claims getClaims() {
-        return jwt.getBody();
+    public Object getClaim(String claim) {
+        String json = new String(Base64.getUrlDecoder().decode(jwtcp.getClaim("raw_token").toString().split("\\.")[1]), StandardCharsets.UTF_8);
+        try {
+            JwtClaims jc = JwtClaims.parse(json);
+
+            return jc.getClaimValue(claim);
+
+        } catch (InvalidJwtException e) {
+            return null;
+        }
     }
+
+    public Collection<String> getClaimNames(){
+        String json = new String(Base64.getUrlDecoder().decode(jwtcp.getClaim("raw_token").toString().split("\\.")[1]), StandardCharsets.UTF_8);
+        try {
+            JwtClaims jc = JwtClaims.parse(json);
+
+            return jc.getClaimNames();
+
+        } catch (InvalidJwtException e) {
+            return Collections.emptySet();
+        }
+    }
+
 }

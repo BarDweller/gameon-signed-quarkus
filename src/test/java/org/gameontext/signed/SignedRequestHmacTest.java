@@ -30,12 +30,9 @@ import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.junit.rules.TestName;
-import org.junit.runner.RunWith;
 
 import mockit.Mocked;
-import mockit.integration.junit4.JMockit;
 
-@RunWith(JMockit.class)
 public class SignedRequestHmacTest {
     static final String id = "MyUserId";
     static final String secret = "fish";

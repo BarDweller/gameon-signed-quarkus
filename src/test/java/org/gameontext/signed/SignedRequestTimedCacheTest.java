@@ -19,9 +19,6 @@ import java.time.Duration;
 
 import javax.enterprise.concurrent.ManagedExecutorService;
 
-import org.gameontext.signed.SignedRequestHmac;
-import org.gameontext.signed.SignedRequestTimedCache;
-import org.gameontext.signed.TimestampedKey;
 import org.junit.Assert;
 import org.junit.Test;
 
