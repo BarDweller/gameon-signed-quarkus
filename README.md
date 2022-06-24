@@ -1,9 +1,14 @@
 # Signed: A library for processing signed JWTs and HMACs in Game On
 
-[![Release](https://jitpack.io/v/org.gameontext/signed.svg)](https://jitpack.io/#org.gameontext/signed)
+[![Release](https://jitpack.io/v/bardweller/gameon-signed-quarkus.svg)](https://jitpack.io/#bardweller/gameon-signed-quarkus)
 
 For client/server consistency, we've created some common libraries to help with
-signing and verifying requests that use JWTs or HMACs
+signing and verifying requests that use JWTs or HMACs.
+
+This version of [gameontext/signed](https://github.com/gameontext/signed) uses SmallRye JWT rather than JJWT. 
+The intent is that this version of signed is better able to tolerate being built into Quarkus Native Apps.
+
+Additionally, this version requires Java 11. I mean.. Java 8 was a long time ago (in a galaxy far far away).
 
 ## Using the library in your Java projects
 
@@ -29,15 +34,15 @@ We use jitpack to build this library, which means you can direct maven or gradle
   * In maven:
   ```
     <dependency>
-      <groupId>org.gameontext</groupId>
-      <artifactId>signed</artifactId>
-      <version>v1.0.4</version>
-    </dependency>
+      <groupId>com.github.bardweller</groupId>
+      <artifactId>gameon-signed-quarkus</artifactId>
+      <version>master-SNAPSHOT</version>
+    </dependency> 
   ```
   * In gradle:
   ```
     dependencies {
-	    compile 'org.gameontext:signed:v1.0.4'
+	    compile 'com.github.bardweller:gameon-signed-quarkus:master-SNAPSHOT'
     }
   ```
 3. Use SignedRequest* utilities to handle request signing
