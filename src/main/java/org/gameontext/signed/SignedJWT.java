@@ -16,7 +16,6 @@
 package org.gameontext.signed;
 
 import java.nio.charset.StandardCharsets;
-import java.security.Key;
 import java.security.PublicKey;
 import java.security.cert.Certificate;
 import java.util.Base64;
@@ -92,7 +91,6 @@ public class SignedJWT {
                 JWTAuthContextInfo ctx = new JWTAuthContextInfo(key, "test");
                 ctx.setIssuedBy(null);
                 ctx.setRequiredClaims(Set.of("sub","aud","name","id","exp","iat"));
-                //ctx.setMaxTimeToLiveSecs(60L * 60L * 25L); //25hrs
 
                 JWTCallerPrincipalFactory factory = JWTCallerPrincipalFactory.instance();
                 jwtcp = factory.parse(token, ctx);
