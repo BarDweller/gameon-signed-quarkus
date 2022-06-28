@@ -21,15 +21,13 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.logging.Level;
 
-import javax.annotation.Resource;
-import javax.enterprise.concurrent.ManagedExecutorService;
 import javax.enterprise.context.ApplicationScoped;
 
-@ApplicationScoped
-public class SignedRequestTimedCache implements Runnable {
+import io.quarkus.arc.Unremovable;
 
-    @Resource
-    ManagedExecutorService managedExecutorService;
+@ApplicationScoped
+@Unremovable
+public class SignedRequestTimedCache {
 
     /** number of requests before a cleanup is triggered */
     final static int TRIGGER_CLEANUP_DEPTH = 1000;
@@ -43,7 +41,16 @@ public class SignedRequestTimedCache implements Runnable {
         // if the count is over or above the cutoff point, try to clean up expired sessions
         // avoid using size() on concurrent maps.
         if ( count >= TRIGGER_CLEANUP_DEPTH && triggerCount.compareAndSet(count, 0) ) {
-            managedExecutorService.execute(this);
+            SignedLogger.writeLog(Level.INFO,this,"Clearing expired hmacs");
+            for ( Entry<String, TimestampedKey> request : requests.entrySet() ) {
+                if ( request.getValue().hasExpired() ) {
+                    requests.remove(request.getKey());
+                } else {
+                    // ConcurrentSkipListMap keeps them in sorted order by time
+                    // stop as soon as we find a not expired one.
+                    break;
+                }
+            }
         }
 
         TimestampedKey t = new TimestampedKey(hmac, expiresIn);
@@ -55,18 +62,4 @@ public class SignedRequestTimedCache implements Runnable {
         }
     }
 
-    @Override
-    public void run() {
-        SignedRequestFeature.writeLog(Level.INFO,this,"Clearing expired hmacs");
-
-        for ( Entry<String, TimestampedKey> request : requests.entrySet() ) {
-            if ( request.getValue().hasExpired() ) {
-                requests.remove(request.getKey());
-            } else {
-                // ConcurrentSkipListMap keeps them in sorted order by time
-                // stop as soon as we find a not expired one.
-                break;
-            }
-        }
-    }
 }

@@ -99,7 +99,7 @@ public class SignedJWT {
                 code = FailureCode.NONE;
             } catch (ParseException e) {
                 code = FailureCode.BAD_SIGNATURE;
-                SignedRequestFeature.writeLog(Level.WARNING, this, "JWT failed validation {0}. {1}", e.getMessage(), token);
+                SignedLogger.writeLog(Level.WARNING, this, "JWT failed validation {0}. {1}", e.getMessage(), token);
             }
         }
 

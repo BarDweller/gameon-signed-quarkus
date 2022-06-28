@@ -15,10 +15,6 @@
  *******************************************************************************/
 package org.gameontext.signed;
 
-import java.util.logging.Level;
-import java.util.logging.Logger;
-
-import javax.enterprise.context.ApplicationScoped;
 import javax.enterprise.inject.spi.CDI;
 import javax.ws.rs.DELETE;
 import javax.ws.rs.GET;
@@ -27,30 +23,17 @@ import javax.ws.rs.container.ResourceInfo;
 import javax.ws.rs.core.FeatureContext;
 import javax.ws.rs.ext.Provider;
 
+import io.quarkus.arc.Unremovable;
+
 @Provider
-@ApplicationScoped
+@Unremovable
 public class SignedRequestFeature implements DynamicFeature {
-
-    final static Logger logger = Logger.getLogger("org.gameontext.signed");
-
-    final static void writeLog(Level level, Object source, String message, Object... args) {
-        if (logger.isLoggable(level)) {
-            logger.logp(level, source.getClass().getName(), "", message, args);
-        }
-    }
-
-    final static void writeLog(Level level, Object source, String message, Throwable thrown) {
-        if (logger.isLoggable(level)) {
-            logger.logp(level, source.getClass().getName(), "", message, thrown);
-        }
-    }
 
     SignedRequestSecretProvider playerClient;
     SignedRequestTimedCache timedCache;
 
     public SignedRequestFeature() {
-        // TODO: Bug in Liberty: @Inject does not work (jax-rs creates its own instance)
-        // work-around is to lookup the CDI beans directly
+        //provider/dynamicfeature isn't a cdi target, so cannot inject beans here, have to lookup programmatically
         playerClient = CDI.current().select(SignedRequestSecretProvider.class).get();
         timedCache = CDI.current().select(SignedRequestTimedCache.class).get();
     }
@@ -58,8 +41,9 @@ public class SignedRequestFeature implements DynamicFeature {
     @Override
     public void configure(ResourceInfo resourceInfo, FeatureContext context) {
         SignedRequest sr = resourceInfo.getResourceMethod().getAnnotation(SignedRequest.class);
-        if ( sr == null )
+        if ( sr == null ){
             return;
+        }
 
         context.register(new SignedContainerRequestFilter(playerClient, timedCache));
 

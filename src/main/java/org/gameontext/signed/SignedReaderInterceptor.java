@@ -40,8 +40,8 @@ public class SignedReaderInterceptor implements ReaderInterceptor {
         SignedRequestHmac hmac = (SignedRequestHmac) context.getProperty("SignedRequestHmac");
 
         if ( hmac != null ) {
-            // Fully read request body
 
+            // Fully read request body
             BufferedReader buffer = new BufferedReader(new InputStreamReader(context.getInputStream(), SignedRequestHmac.UTF8));
             String body = buffer.lines().collect(Collectors.joining("\n"));
             byte[] bodyBytes = body.getBytes(SignedRequestHmac.UTF8);
@@ -55,7 +55,7 @@ public class SignedReaderInterceptor implements ReaderInterceptor {
                 // what we read...
                 context.setInputStream(new ByteArrayInputStream(bodyBytes));
             }
-            SignedRequestFeature.writeLog(Level.FINEST, this, "READER INTERCEPTOR: {0} {1}", hmac);
+            SignedLogger.writeLog(Level.FINEST, this, "READER INTERCEPTOR: {0} {1}", hmac);
         }
         return context.proceed();
     }

@@ -45,7 +45,7 @@ public class SignedContainerRequestFilter implements ContainerRequestFilter {
         this.timedCache = timedCache;
 
         if ( playerClient == null || timedCache == null ) {
-            SignedRequestFeature.writeLog(Level.SEVERE, this,
+            SignedLogger.writeLog(Level.SEVERE, this,
                     "Required resources are not available: playerClient={0}, timedCache={1}",
                     playerClient, timedCache);
             throw new IllegalStateException("Required resources are not available");
@@ -70,13 +70,14 @@ public class SignedContainerRequestFilter implements ContainerRequestFilter {
      */
     @Override
     public void filter(ContainerRequestContext requestContext) throws IOException {
+
         WebApplicationException invalidHmacEx = null;
         SignedRequestHmac hmac = null;
 
         String userId = requestContext.getHeaderString(SignedRequestHmac.GAMEON_ID);
         String method = requestContext.getMethod();
 
-        SignedRequestFeature.writeLog(Level.FINEST, this, "REQUEST FILTER: USER={0}, PATH={1}, QUERY={2}, HEADERS={3}",
+        SignedLogger.writeLog(Level.FINEST, this, "REQUEST FILTER: USER={0}, PATH={1}, QUERY={2}, HEADERS={3}",
                 userId,
                 method + " "  + requestContext.getUriInfo().getAbsolutePath().getRawPath(),
                 requestContext.getUriInfo().getQueryParameters(false),
@@ -86,22 +87,24 @@ public class SignedContainerRequestFilter implements ContainerRequestFilter {
             if ( "GET".equals(method) ) {
                 // no validation required for GET requests. If an ID isn't provided,
                 // then we won't do validation and will just return.
-                SignedRequestFeature.writeLog(Level.FINEST, this, "FILTER: GET WITH NO ID-- NO VERIFICATION");
+                SignedLogger.writeLog(Level.FINEST, this, "FILTER: GET WITH NO ID-- NO VERIFICATION");
                 return;
             } else {
                 //debug empty userid header..
                 if(userId!=null){
                     BufferedReader buffer = new BufferedReader(new InputStreamReader(requestContext.getEntityStream(), SignedRequestHmac.UTF8));
                     String body = buffer.lines().collect(Collectors.joining("\n"));
-                    SignedRequestFeature.writeLog(Level.FINEST,this,"BODY: "+body);
+                    SignedLogger.writeLog(Level.FINEST,this,"BODY: "+body);
                 }
 
-                SignedRequestFeature.writeLog(Level.FINEST, this, "FILTER: "+method+" WITH NO ID-- UNAUTHORIZED");
+                SignedLogger.writeLog(Level.FINEST, this, "FILTER: "+method+" WITH NO ID-- UNAUTHORIZED");
                 // STOP!! turn this right around with the bad response
                 requestContext.abortWith(Response.status(Status.FORBIDDEN).build());
                 return;
             }
         }
+
+        SignedLogger.writeLog(Level.FINEST, this, "FILTER: ID PRESENT.. VALIDATING...");
 
         try {
             SignedRequestMap headers = new SignedRequestMap.MVSS_StringMap(requestContext.getHeaders());
@@ -121,7 +124,9 @@ public class SignedContainerRequestFilter implements ContainerRequestFilter {
                 // @see SignedReaderInterceptor as assigned by SignedRequestFeature
                 requestContext.setProperty("SignedRequestHmac", hmac);
             } else {
+                SignedLogger.writeLog(Level.FINEST, this, "FILTER: verifying hmac");
                 hmac.verifyFullSignature();
+                SignedLogger.writeLog(Level.FINEST, this, "FILTER: hmac verified");
             }
         } catch(WebApplicationException ex) {
             invalidHmacEx = ex;
@@ -131,9 +136,11 @@ public class SignedContainerRequestFilter implements ContainerRequestFilter {
         }
 
         requestContext.setProperty("player.id", userId);
-        SignedRequestFeature.writeLog(Level.FINEST, this, "FILTER: {0} {1}", invalidHmacEx, hmac);
+        SignedLogger.writeLog(Level.FINEST, this, "FILTER: {0} {1}", invalidHmacEx, hmac);
 
         if ( invalidHmacEx != null ) {
+            invalidHmacEx.printStackTrace();
+
             // STOP!! turn this right around with the bad response
             requestContext.abortWith(invalidHmacEx.getResponse());
         }

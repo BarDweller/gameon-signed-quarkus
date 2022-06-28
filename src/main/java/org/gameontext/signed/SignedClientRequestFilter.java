@@ -89,7 +89,7 @@ public class SignedClientRequestFilter implements ClientRequestFilter, WriterInt
         SignedRequestMap headers = new SignedRequestMap.MVSO_StringMap(requestContext.getHeaders());
         SignedRequestMap parameters = new SignedRequestMap.QueryParameterMap(requestContext.getUri().getRawQuery());
 
-        SignedRequestFeature.writeLog(Level.FINEST, this, "REQUEST FILTER: USER={0}, PATH={1}, QUERY={2}, HEADERS={3}, HAS_ENTITY={4}",
+        SignedLogger.writeLog(Level.FINEST, this, "REQUEST FILTER: USER={0}, PATH={1}, QUERY={2}, HEADERS={3}, HAS_ENTITY={4}",
                 userId,
                 requestContext.getMethod() + " "  + requestContext.getUri().getRawPath(),
                 requestContext.getUri().getRawQuery(),
@@ -120,7 +120,7 @@ public class SignedClientRequestFilter implements ClientRequestFilter, WriterInt
                     e, Response.Status.INTERNAL_SERVER_ERROR);
         }
 
-        SignedRequestFeature.writeLog(Level.FINEST, this, "CLIENT FILTER: {0} {1} {2}", invalidHmacEx, clientHmac, headers);
+        SignedLogger.writeLog(Level.FINEST, this, "CLIENT FILTER: {0} {1} {2}", invalidHmacEx, clientHmac, headers);
 
         if ( invalidHmacEx != null ) {
             // STOP!! turn this right around with the bad response

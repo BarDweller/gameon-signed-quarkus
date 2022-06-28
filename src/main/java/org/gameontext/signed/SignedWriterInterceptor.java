@@ -60,7 +60,7 @@ public class SignedWriterInterceptor implements WriterInterceptor {
                 hmac.generateBodyHash(headers, body)
                     .signRequest(headers);
 
-                SignedRequestFeature.writeLog(Level.FINEST, this, "WRITER INTERCEPTOR: {0}", headers);
+                SignedLogger.writeLog(Level.FINEST, this, "WRITER INTERCEPTOR: {0}", headers);
             } finally {
                 // Write the response
                 old.write(body);

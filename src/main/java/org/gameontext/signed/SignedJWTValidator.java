@@ -16,7 +16,6 @@
 package org.gameontext.signed;
 
 import java.io.ByteArrayInputStream;
-import java.nio.charset.StandardCharsets;
 import java.security.cert.Certificate;
 import java.security.KeyFactory;
 import java.security.NoSuchAlgorithmException;
@@ -33,14 +32,13 @@ import javax.annotation.PostConstruct;
 import javax.enterprise.context.ApplicationScoped;
 
 import org.eclipse.microprofile.config.ConfigProvider;
-import org.jose4j.jwt.JwtClaims;
-import org.jose4j.jwt.consumer.InvalidJwtException;
 
-import io.smallrye.jwt.auth.principal.JWTCallerPrincipal;
+import io.quarkus.arc.Unremovable;
 import io.smallrye.jwt.build.Jwt;
 import io.smallrye.jwt.build.JwtClaimsBuilder;
 
 @ApplicationScoped
+@Unremovable
 public class SignedJWTValidator {
 
 
