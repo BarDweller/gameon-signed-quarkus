@@ -23,7 +23,6 @@ import org.junit.Assert;
 import org.junit.Test;
 
 import mockit.Mocked;
-import mockit.Verifications;
 
 public class SignedRequestTimedCacheTest {
 
@@ -50,7 +49,6 @@ public class SignedRequestTimedCacheTest {
     public void testTrigger(@Mocked ManagedExecutorService executor) {
 
         SignedRequestTimedCache cache = new SignedRequestTimedCache();
-        cache.managedExecutorService = executor;
 
         // executor not called for this one
         cache.triggerCount.set(1);
@@ -63,16 +61,11 @@ public class SignedRequestTimedCacheTest {
         // executor triggered to clean up for this one
         cache.triggerCount.set(SignedRequestTimedCache.TRIGGER_CLEANUP_DEPTH + 1);
         cache.isDuplicate("fred", SignedRequestHmac.EXPIRES_REPLAY_MS);
-
-        new Verifications() {{
-            executor.execute(cache); times = 2;
-        }};
     }
 
     @Test
     public void testCacheExpiration(@Mocked ManagedExecutorService executor) {
         SignedRequestTimedCache cache = new SignedRequestTimedCache();
-        cache.managedExecutorService = executor;
 
         cache.requests.put("A", new TimestampedKey("A", Duration.ofMillis(1)));
         cache.requests.put("B", new TimestampedKey("B", SignedRequestHmac.EXPIRES_REPLAY_MS));
@@ -81,7 +74,10 @@ public class SignedRequestTimedCacheTest {
         snooze(3); // make sure "A" has expired
         Assert.assertTrue("'A' should be expired", cache.requests.get("A").hasExpired());
 
-        cache.run();
+        //calls to isduplicate flush the cache of expired keys.
+        cache.triggerCount.set(SignedRequestTimedCache.TRIGGER_CLEANUP_DEPTH + 1);
+        cache.isDuplicate("B", SignedRequestHmac.EXPIRES_REPLAY_MS);
+
         Assert.assertEquals(1, cache.requests.size());
         Assert.assertNull("'A' should have been deleted: " + cache.requests, cache.requests.get("A"));
         Assert.assertNotNull("'B' should remain: " + cache.requests, cache.requests.get("B"));
